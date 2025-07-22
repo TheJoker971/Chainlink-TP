@@ -16,7 +16,7 @@ import { ILotteryGold } from "./interfaces/ILotteryGold.sol";
  */
 contract LotteryGold is VRFConsumerBaseV2Plus, ILotteryGold {
     /// ─── VRF CONFIG ────────────────────────────────────────────────────────────
-    uint64  private immutable s_subscriptionId;
+    uint256  private immutable s_subscriptionId;
 
     address private constant vrfCoordinator      = 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B;
     bytes32 private constant s_keyHash           = 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae;
@@ -33,7 +33,7 @@ contract LotteryGold is VRFConsumerBaseV2Plus, ILotteryGold {
     uint256 private s_lastRequestId;
 
     /// @param subscriptionId ID de la subscription VRF v2+
-    constructor(uint64 subscriptionId)
+    constructor(uint256 subscriptionId)
         VRFConsumerBaseV2Plus(vrfCoordinator)
     {
         s_subscriptionId = subscriptionId;

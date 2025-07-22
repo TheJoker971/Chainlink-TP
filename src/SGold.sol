@@ -10,9 +10,9 @@ import { ILotteryGold }          from "./interfaces/ILotteryGold.sol";
  * @title  SGold
  * @notice Un ERC20 “stablecoin” indexé sur le prix de l’or :
  *         • Les utilisateurs mint en déposant de l’ETH  
- *         • 20% de l’ETH va au owner, 10% à la loterie, 70% est verrouillé  
+ *         • 20 % de l’ETH va au owner, 10 % à la loterie, 70 % est verrouillé  
  *         • Lors du mint, on appelle participate(user) sur la loterie  
- *         • Les utilisateurs peuvent “redeem” leurs SGLD pour récupérer la part de 70% en ETH
+ *         • Les utilisateurs peuvent “redeem” leurs SGLD pour récupérer la part de 70 % en ETH
  */
 contract SGold is ERC20, Ownable {
     uint256 public immutable MAX_MINT;
@@ -30,7 +30,7 @@ contract SGold is ERC20, Ownable {
     event Mint   (address indexed user, uint256 ethDeposited, uint256 tokensMinted);
     event Redeem (address indexed user, uint256 tokensBurned, uint256 ethReturned);
 
-    constructor(uint256 _MAX_MINT) ERC20("SGold", "SGLD") Ownable(msg.sender){
+    constructor(uint256 _MAX_MINT) ERC20("SGold", "SGLD") Ownable(msg.sender) {
         MAX_MINT = _MAX_MINT;
     }
 
@@ -48,33 +48,36 @@ contract SGold is ERC20, Ownable {
 
     /**
      * @notice Mint de SGLD en déposant de l’ETH  
-     *         20% → owner, 10% → loterie, 70% réservés  
+     *         20 % → owner, 10 % → loterie, 70 % réservés  
      *         Et enregistre l’utilisateur dans la loterie
      */
     function mint() external payable {
         require(msg.value > 0, "No ETH sent");
 
-        // répartitions
-        uint256 ownerPortion   = (msg.value * 20) / 100;
-        uint256 lotteryPortion = (msg.value * 10) / 100;
-        uint256 reservePortion = msg.value - ownerPortion - lotteryPortion; // 70%
+        // 1) Calcule la portion réservée et le nombre de tokens à minter
+        uint256 reservePortion = (msg.value * 70) / 100;
+        uint256 ethUsd         = _getLatestPrice(ethUsdFeed);
+        uint256 goldUsd        = _getLatestPrice(goldUsdFeed);
+        uint256 reservedUsd    = (reservePortion * ethUsd) / 1e18;
+        uint256 tokensToMint   = (reservedUsd * 1e18) / goldUsd;
 
-        // transferts
-        payable(owner()).transfer(ownerPortion);
-        payable(lotteryAddress).transfer(lotteryPortion);
-
-        // enregistrement du participant
-        ILotteryGold(lotteryAddress).participate(msg.sender);
-
-        // calculs de mint
-        uint256 ethUsd   = _getLatestPrice(ethUsdFeed);
-        uint256 goldUsd  = _getLatestPrice(goldUsdFeed);
-        uint256 reservedUsd = (reservePortion * ethUsd) / 1e18;
-        uint256 tokensToMint = (reservedUsd * 1e18) / goldUsd;
-
+        // 2) Vérifie la limite max avant tout transfert
         require(totalSupply() + tokensToMint <= MAX_MINT, "Exceeds max supply");
 
-        // sauvegarde pour redemption
+        // 3) Calcule les répartitions
+        uint256 ownerPortion   = (msg.value * 20) / 100;
+        uint256 lotteryPortion = msg.value - ownerPortion - reservePortion; // 10 %
+
+        // 4) Transferts en utilisant .call pour allouer assez de gas
+        (bool sentOwner, )   = payable(owner()).call{value: ownerPortion}("");
+        require(sentOwner, "Owner transfer failed");
+        (bool sentLotto, )   = payable(lotteryAddress).call{value: lotteryPortion}("");
+        require(sentLotto, "Lottery transfer failed");
+
+        // 5) Enregistre le participant dans la loterie
+        ILotteryGold(lotteryAddress).participate(msg.sender);
+
+        // 6) Sauvegarde pour redemption puis mint
         reservedEther[msg.sender] += reservePortion;
         mintedTokens[msg.sender]  += tokensToMint;
 
@@ -87,20 +90,23 @@ contract SGold is ERC20, Ownable {
      */
     function redeem(uint256 tokenAmount) external {
         require(tokenAmount > 0, "Zero tokens");
-        uint256 userTokens  = mintedTokens[msg.sender];
+        uint256 userTokens = mintedTokens[msg.sender];
         require(userTokens >= tokenAmount, "Too many tokens");
 
         uint256 userReserve = reservedEther[msg.sender];
         uint256 ethToReturn = (userReserve * tokenAmount) / userTokens;
 
+        // Met à jour les soldes
         mintedTokens[msg.sender]  = userTokens - tokenAmount;
         reservedEther[msg.sender] = userReserve - ethToReturn;
 
         _burn(msg.sender, tokenAmount);
-        payable(msg.sender).transfer(ethToReturn);
+        (bool success, ) = payable(msg.sender).call{value: ethToReturn}("");
+        require(success, "Redeem transfer failed");
 
         emit Redeem(msg.sender, tokenAmount, ethToReturn);
     }
 
+    /// @notice Pour recevoir des ETH via call (pas via transfer)
     receive() external payable {}
 }
