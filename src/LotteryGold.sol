@@ -98,6 +98,10 @@ contract LotteryGold is VRFConsumerBaseV2Plus, ILotteryGold {
         indexParticipant = 0;
     }
 
+    function getLastRequestId() external view returns(uint256) {
+        return s_lastRequestId;
+    }
+
     /// @notice Pour alimenter la cagnotte depuis l’extérieur (ERC20)
     receive() external payable {}
 }

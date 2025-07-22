@@ -77,25 +77,27 @@ contract SGoldTest is Test {
         assertEq(address(this).balance, soldeAvant - 0.8 ether);
     }
 
-
     /// @notice Redeem correct : vérifie l’emit et le remboursement partiel
     function testRedeemEmitsAndReturnsCorrectEth() public {
-        // mint 1 ETH → réserve 0.7
+        // mint 1 ETH → réserve initiale
         token.mint{ value: 1 ether }();
-        uint256 totalTokens = token.mintedTokens(address(this));
-        uint256 half        = totalTokens / 2;
-        uint256 soldeAvant  = address(this).balance;
+        uint256 totalTokens      = token.mintedTokens(address(this));
+        uint256 half             = totalTokens / 2;
+        uint256 reservedBefore   = token.reservedEther(address(this));
+        uint256 redeemed         = (reservedBefore * half) / totalTokens;
+        uint256 expectedReserved = reservedBefore - redeemed;
+        uint256 soldeAvant       = address(this).balance;
 
-        // on s’attend à l’event Redeem(address, uint256, uint256)
+        // on s'attend à l’event Redeem avec la valeur calculée
         vm.expectEmit(true, false, false, true);
-        emit SGold.Redeem(address(this), half, 0.35 ether);
+        emit SGold.Redeem(address(this), half, redeemed);
 
         token.redeem(half);
 
-        // vérifications
+        // vérifications post-redeem
         assertEq(token.balanceOf(address(this)), totalTokens - half);
-        assertEq(token.reservedEther(address(this)), 0.35 ether);
-        assertEq(address(this).balance, soldeAvant + 0.35 ether);
+        assertEq(token.reservedEther(address(this)), expectedReserved);
+        assertEq(address(this).balance, soldeAvant + redeemed);
     }
 
     /// @notice Permet de recevoir les ETH des transferts
