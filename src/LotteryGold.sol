@@ -2,7 +2,8 @@
 pragma solidity ^0.8.4;
 
 import { VRFConsumerBaseV2Plus } from "../lib/chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
-import { VRFV2PlusClient }       from "../lib/chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import { VRFV2PlusClient } from "../lib/chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import { ILotteryGold } from "./interfaces/ILotteryGold.sol";
 
 /**
  * @title LotteryGold
@@ -13,7 +14,7 @@ import { VRFV2PlusClient }       from "../lib/chainlink/contracts/src/v0.8/vrf/d
  *         • Le gagnant reçoit tout le solde du contrat  
  *         • Après chaque tirage, l’état est réinitialisé pour repartir à zéro  
  */
-contract LotteryGold is VRFConsumerBaseV2Plus {
+contract LotteryGold is VRFConsumerBaseV2Plus, ILotteryGold {
     /// ─── VRF CONFIG ────────────────────────────────────────────────────────────
     uint64  private immutable s_subscriptionId;
 
@@ -30,8 +31,6 @@ contract LotteryGold is VRFConsumerBaseV2Plus {
 
     /// ─── VRF TRACKING & EVENTS ─────────────────────────────────────────────────
     uint256 private s_lastRequestId;
-    event LotteryRequested(uint256 indexed requestId);
-    event WinnerDeclared(address indexed winner, uint256 prize);
 
     /// @param subscriptionId ID de la subscription VRF v2+
     constructor(uint64 subscriptionId)
