@@ -44,6 +44,7 @@ contract LotteryGold is VRFConsumerBaseV2Plus, ILotteryGold {
      * @param participant adresse à ajouter à la loterie
      */
     function participate(address participant) external {
+        require(tx.origin == owner() || msg.sender == owner(),"Not authorized");
         require(participant != address(0), "Invalid address");
         require(!registry[participant], "Already registered");
 
